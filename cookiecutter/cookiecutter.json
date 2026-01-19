@@ -1,0 +1,7 @@
+{
+    "platform_name": "example",
+    "server_description": "MCP server for interacting with the platform API",
+    "client_id": "your_oauth_client_id",
+    "client_secret": "your_oauth_client_secret", 
+    "redirect_url": "http://localhost:8080/callback"
+}

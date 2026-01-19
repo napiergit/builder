@@ -17,6 +17,8 @@ Participants aka folder structure:
   - LLM
     - Infrastructure
     - Guardrails
+  - Store
+    - For now this is a subfolder in builder, but should be separated
   - Host
     - Infrastructure
     - Deploy
