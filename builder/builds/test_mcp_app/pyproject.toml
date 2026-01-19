@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "test_mcp_app"
+version = "0.1.0"
+description = "MCP server with OAuth integration"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+requires-python = ">=3.8"
+dependencies = [
+    "fastmcp",
+    "google-auth",
+    "google-auth-oauthlib", 
+    "google-api-python-client",
+    "httpx",
+    "python-dotenv"
+]
+
+[project.scripts]
+test_mcp_app = "test_mcp_app.server:main"

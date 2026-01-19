@@ -1,6 +1,9 @@
 {
     "platform_name": "example",
     "server_description": "MCP server for interacting with the platform API",
+    "oauth_provider": ["google", "github", "custom"],
+    "include_oauth": ["yes", "no"],
+    "include_client_registry": ["yes", "no"],
     "client_id": "your_oauth_client_id",
     "client_secret": "your_oauth_client_secret", 
     "redirect_url": "http://localhost:8080/callback"
