@@ -12,7 +12,7 @@ import httpx
 import subprocess
 from datetime import datetime
 
-from config import DeploymentConfig
+from .config import DeploymentConfig
 
 
 class Deployer:

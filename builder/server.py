@@ -32,7 +32,7 @@ def get_user_uuid(email: str) -> str:
 
 def get_builds_path(user_uuid: str, platform: str, version: int) -> Path:
     """Get the path for builds storage"""
-    base_path = Path(__file__).parent.parent / "builds"
+    base_path = Path(__file__).parent / "builds"
     return base_path / user_uuid / platform / str(version)
 
 async def assess_platform_api(platform: str) -> Dict[str, Any]:
@@ -194,7 +194,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             )]
         
         # Determine next version number
-        base_builds_path = Path(__file__).parent.parent / "builds" / user_uuid / platform
+        base_builds_path = Path(__file__).parent / "builds" / user_uuid / platform
         version = 1
         if base_builds_path.exists():
             existing_versions = [int(p.name) for p in base_builds_path.iterdir() if p.is_dir() and p.name.isdigit()]

@@ -17,5 +17,6 @@ All lowercase.
 # History and end of prompt
     - I want you to always keep a record of our chat history in the chats folder
         - When you are done carrying out your instructions
-        - Create a numbered file under chats directory with prompts and all your reasoning
+        - Create a numbered file under chats directory with:
+          - Comprehensive history of our chat including prompts and all your reasoning
     - Also create a relevant commit message and commit the changes using git

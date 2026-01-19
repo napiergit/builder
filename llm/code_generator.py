@@ -11,9 +11,9 @@ from pathlib import Path
 import tempfile
 import subprocess
 
-from api_analyzer import APIAnalyzer
-from guardrails import GuardrailsEngine
-from validator import CodeValidator
+from .api_analyzer import APIAnalyzer
+from .guardrails import GuardrailsEngine
+from .validator import CodeValidator
 
 
 class CodeGenerator:

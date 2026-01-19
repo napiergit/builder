@@ -29,7 +29,7 @@ class MCPBuilderPipeline:
         self.code_generator = CodeGenerator()
         self.deployment_config = DeploymentConfig()
         self.deployer = Deployer(self.deployment_config)
-        self.builds_base_path = Path(__file__).parent / "builds"
+        self.builds_base_path = Path(__file__).parent / "builder" / "builds"
         
     async def execute_build_pipeline(
         self,
@@ -364,7 +364,7 @@ Generated at: {datetime.now().isoformat()}
         user_uuid: str,
         platform: str,
         current_version: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[Dict[str, Any]]:
         """Load previous versions for context"""
         
         previous_versions = []
