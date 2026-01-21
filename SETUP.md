@@ -26,10 +26,6 @@ LLM_ENDPOINT=http://localhost:11434  # For local Ollama
 # OPENAI_API_KEY=your_openai_api_key  # For OpenAI
 # ANTHROPIC_API_KEY=your_anthropic_key  # For Claude
 
-# OAuth Credentials (for generated servers)
-OAUTH_CLIENT_ID=your_oauth_client_id
-OAUTH_CLIENT_SECRET=your_oauth_client_secret
-OAUTH_REDIRECT_URI=http://localhost:8080/callback
 ```
 
 ## Installation
