@@ -13,18 +13,11 @@ from pathlib import Path
 import os
 import sys
 
-from mcp.server.models import InitializeResult
-from mcp.server import NotificationOptions, Server  
-from mcp.types import Resource, Tool, TextContent, ImageContent, EmbeddedResource
 from starlette.applications import Starlette
 from starlette.routing import Route
 from starlette.responses import JSONResponse
 from starlette.requests import Request
-import mcp.types as types
 import uvicorn
-
-# Create the MCP server instance
-server = Server("mcp-builder")
 
 # User management
 user_db = {}  # email -> uuid mapping
@@ -62,14 +55,13 @@ async def assess_platform_api(platform: str) -> Dict[str, Any]:
     # For unknown platforms, return as potentially viable but needs assessment
     return {"viable": True, "oauth_required": False, "needs_research": True}
 
-@server.list_tools()
-async def handle_list_tools() -> list[Tool]:
+def get_available_tools():
     """List available tools"""
     return [
-        Tool(
-            name="is_building_mcp_server_viable",
-            description="Check if building an MCP server for a platform is viable",
-            inputSchema={
+        {
+            "name": "is_building_mcp_server_viable",
+            "description": "Check if building an MCP server for a platform is viable",
+            "inputSchema": {
                 "type": "object",
                 "properties": {
                     "platform": {
@@ -79,11 +71,11 @@ async def handle_list_tools() -> list[Tool]:
                 },
                 "required": ["platform"]
             }
-        ),
-        Tool(
-            name="build_mcp_server", 
-            description="Build an MCP server for the specified platform",
-            inputSchema={
+        },
+        {
+            "name": "build_mcp_server", 
+            "description": "Build an MCP server for the specified platform",
+            "inputSchema": {
                 "type": "object",
                 "properties": {
                     "platform": {
@@ -97,16 +89,15 @@ async def handle_list_tools() -> list[Tool]:
                 },
                 "required": ["platform", "description"]
             }
-        )
+        }
     ]
 
-@server.call_tool()
-async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+async def handle_tool_call(name: str, arguments: dict):
     """Handle tool calls"""
     if name == "is_building_mcp_server_viable":
         platform = arguments.get("platform")
         if not platform:
-            return [types.TextContent(type="text", text="Error: platform is required")]
+            return {"error": "platform is required"}
         
         # Assess platform viability
         assessment = await assess_platform_api(platform)
@@ -128,22 +119,22 @@ async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent
                 "message": f"Building an MCP server for {platform} is not currently supported"
             }
             
-        return [types.TextContent(type="text", text=json.dumps(response, indent=2))]
+        return {"text": json.dumps(response, indent=2)}
     
     elif name == "build_mcp_server":
         return await handle_build_server_tool(arguments)
     
     else:
-        return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
+        return {"error": f"Unknown tool: {name}"}
 
-async def handle_build_server_tool(arguments: dict) -> list[types.TextContent]:
+async def handle_build_server_tool(arguments: dict):
     """Handle build_mcp_server tool calls"""
     platform = arguments.get("platform")
     description = arguments.get("description")
     
     # Validate required parameters
     if not all([platform, description]):
-        return [types.TextContent(type="text", text="Error: platform and description are required")]
+        return {"error": "platform and description are required"}
     
     # Get fixed public UUID
     user_uuid = get_user_uuid()
@@ -162,7 +153,7 @@ async def handle_build_server_tool(arguments: dict) -> list[types.TextContent]:
         }
         
         # Save feature request (in real implementation, save to database)
-        return [types.TextContent(type="text", text=f"Platform {platform} is not currently supported, but your request has been noted for future development.")]
+        return {"text": f"Platform {platform} is not currently supported, but your request has been noted for future development."}
     
     # Determine next version number
     base_builds_path = Path(__file__).parent / "builds" / user_uuid / platform
@@ -203,7 +194,7 @@ async def handle_build_server_tool(arguments: dict) -> list[types.TextContent]:
         # Pipeline not available, continue without it
         print(f"Build pipeline triggered for {user_uuid}/{platform}/v{version}")
     
-    return [types.TextContent(type="text", text=f"MCP server build initiated for {platform}. Build ID: {user_uuid}/{platform}/v{version}. Build will be publicly accessible when deployment is complete.")]
+    return {"text": f"MCP server build initiated for {platform}. Build ID: {user_uuid}/{platform}/v{version}. Build will be publicly accessible when deployment is complete."}
 
 async def handle_mcp(request: Request):
     """Handle MCP protocol requests on /mcp endpoint"""
@@ -231,18 +222,12 @@ async def handle_mcp(request: Request):
             }
             
         elif method == "tools/list":
-            tools = await handle_list_tools()
+            tools = get_available_tools()
             response = {
                 "jsonrpc": "2.0", 
                 "id": request_id,
                 "result": {
-                    "tools": [
-                        {
-                            "name": tool.name,
-                            "description": tool.description,
-                            "inputSchema": tool.inputSchema
-                        } for tool in tools
-                    ]
+                    "tools": tools
                 }
             }
             
@@ -251,19 +236,30 @@ async def handle_mcp(request: Request):
             arguments = params.get("arguments", {})
             
             try:
-                result = await handle_call_tool(tool_name, arguments)
-                response = {
-                    "jsonrpc": "2.0",
-                    "id": request_id, 
-                    "result": {
-                        "content": [
-                            {
-                                "type": content.type,
-                                "text": content.text
-                            } for content in result
-                        ]
+                result = await handle_tool_call(tool_name, arguments)
+                
+                if "error" in result:
+                    response = {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "error": {
+                            "code": -1,
+                            "message": result["error"]
+                        }
                     }
-                }
+                else:
+                    response = {
+                        "jsonrpc": "2.0",
+                        "id": request_id, 
+                        "result": {
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": result.get("text", str(result))
+                                }
+                            ]
+                        }
+                    }
             except Exception as e:
                 response = {
                     "jsonrpc": "2.0",
