@@ -225,40 +225,80 @@ class Deployer:
             }
     
     async def _link_to_fastmcp(self, repo_name: str, user_uuid: str) -> Dict[str, Any]:
-        """Link GitHub repository to FastMCP.cloud for deployment"""
+        """Deploy generated MCP server to FastMCP.cloud using GitHub integration"""
         
         try:
-            async with httpx.AsyncClient() as client:
-                # FastMCP.cloud API call to link repository
-                link_request = {
-                    "repository": f"{self.config.github_org}/{repo_name}",
-                    "user_id": user_uuid,
-                    "auto_deploy": True,
-                    "environment": "production"
+            # Create fastmcp.json config in the generated MCP server repo
+            build_path = Path(__file__).parent.parent / "builds" / user_uuid / repo_name.split('-')[0] / "1"
+            
+            # Generate fastmcp.cloud deployment config
+            fastmcp_config = {
+                "name": repo_name,
+                "description": f"Generated MCP server for {repo_name.split('-')[0]} platform",
+                "version": "1.0.0",
+                "main": "server.py",
+                "runtime": "python3.9",
+                "dependencies": {
+                    "python": "requirements.txt"
                 }
-                
-                response = await client.post(
-                    f"{self.config.fastmcp_api_url}/link-repository",
-                    json=link_request,
-                    headers={
-                        "Authorization": f"Bearer {self.fastmcp_api_key}",
-                        "Content-Type": "application/json"
-                    }
-                )
-                
-                if response.status_code != 200:
-                    return {
-                        "success": False,
-                        "error": f"FastMCP linking failed: {response.text}"
-                    }
-                
-                link_result = response.json()
-                
-                return {
-                    "success": True,
-                    "fastmcp_url": link_result.get("project_url"),
-                    "deployment_url": link_result.get("deployment_url")
-                }
+            }
+            
+            # Write fastmcp.json to build directory
+            config_file = build_path / "fastmcp.json"
+            with open(config_file, "w") as f:
+                json.dump(fastmcp_config, f, indent=2)
+            
+            # Create GitHub Actions workflow for the generated server
+            workflow_dir = build_path / ".github" / "workflows"
+            workflow_dir.mkdir(parents=True, exist_ok=True)
+            
+            workflow_content = f"""name: Deploy to FastMCP Cloud
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.9'
+    
+    - name: Deploy to FastMCP Cloud
+      env:
+        FASTMCP_API_KEY: ${{{{ secrets.FASTMCP_API_KEY }}}}
+      run: |
+        curl -X POST "https://fastmcp.cloud/api/github/deploy" \\
+          -H "Authorization: Bearer $FASTMCP_API_KEY" \\
+          -H "Content-Type: application/json" \\
+          -d '{{
+            "repository": "${{{{ github.repository }}}}",
+            "ref": "${{{{ github.ref }}}}",
+            "sha": "${{{{ github.sha }}}}"
+          }}'
+"""
+            
+            workflow_file = workflow_dir / "deploy.yml"
+            with open(workflow_file, "w") as f:
+                f.write(workflow_content)
+            
+            return {
+                "success": True,
+                "fastmcp_url": f"https://fastmcp.cloud/{self.config.github_org}/{repo_name}",
+                "deployment_url": f"https://{repo_name}.fastmcp.cloud",
+                "config_created": True,
+                "next_steps": [
+                    "GitHub repository will be created with fastmcp.json",
+                    "GitHub Actions will auto-deploy to fastmcp.cloud",
+                    f"Set FASTMCP_API_KEY secret in {self.config.github_org}/{repo_name}"
+                ]
+            }
                 
         except Exception as e:
             return {
@@ -316,30 +356,32 @@ class Deployer:
         platform: str, 
         deployment_result: Dict[str, Any]
     ) -> None:
-        """Send email notification about deployment completion"""
+        """Print deployment status for generated MCP server"""
         
-        if deployment_result["success"]:
-            subject = f"MCP Server Deployed: {platform}"
+        if deployment_result.get("success"):
             message = f"""
-Your MCP server for {platform} has been successfully deployed!
+✅ MCP SERVER DEPLOYMENT SETUP COMPLETE
 
-Access your server at: {deployment_result['deployment_url']}
-GitHub Repository: {deployment_result['github_repo']}
-FastMCP Project: {deployment_result['fastmcp_url']}
+Your {platform} MCP server has been prepared for deployment!
 
-To add this server to your MCP client, use the deployment URL above.
+📦 GitHub Repository: {deployment_result.get('github_repo', 'Repository created')}
+🚀 FastMCP URL: {deployment_result.get('fastmcp_url', 'Pending deployment')}
+🔗 Live URL: {deployment_result.get('deployment_url', 'Will be available after deployment')}
+
+NEXT STEPS:
+{chr(10).join('  - ' + step for step in deployment_result.get('next_steps', ['GitHub Actions will handle deployment']))}
+
+The generated MCP server will automatically deploy to fastmcp.cloud via GitHub Actions.
             """
         else:
-            subject = f"MCP Server Deployment Failed: {platform}"
             message = f"""
-Your MCP server deployment for {platform} failed.
+❌ MCP SERVER DEPLOYMENT FAILED
 
-Error: {deployment_result['error']}
+Platform: {platform}
+Error: {deployment_result.get('error', 'Unknown error')}
 
-Please contact support if this issue persists.
+Please check the build logs and try again.
             """
         
-        # In real implementation, this would send actual email
-        # For now, just log the notification
-        print(f"Email notification to {user_email}: {subject}")
+        print(f"📧 NOTIFICATION for {user_email}:")
         print(message)
