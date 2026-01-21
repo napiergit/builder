@@ -1,0 +1,24 @@
+{
+  "name": "mcp-builder",
+  "description": "MCP Builder - Automated MCP server generation and deployment",
+  "version": "1.0.0",
+  "author": "napiergit",
+  "main": "server.py",
+  "runtime": "python3.9",
+  "dependencies": {
+    "python": "requirements.txt"
+  },
+  "environment": {
+    "PORT": "8000"
+  },
+  "tools": [
+    {
+      "name": "is_building_mcp_server_viable",
+      "description": "Check if a platform API is viable for MCP server creation"
+    },
+    {
+      "name": "build_mcp_server",
+      "description": "Build and deploy an MCP server for a specified platform"
+    }
+  ]
+}
