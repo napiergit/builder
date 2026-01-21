@@ -298,6 +298,10 @@ app = Starlette(
     ]
 )
 
+# FastMCP expects these variable names for deployment
+mcp = app  # FastMCP compatibility
+server = app  # Alternative name
+
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
