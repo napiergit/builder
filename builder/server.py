@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 MCP Builder Server - Builds MCP servers based on platform APIs
-FastMCP Compatible Version
+Standard MCP Server Implementation
 """
 
 import asyncio
@@ -13,37 +13,24 @@ from pathlib import Path
 import os
 import sys
 
-try:
-    from fastmcp import FastMCP
-except ImportError:
-    # Fallback implementation for FastMCP compatibility
-    class FastMCP:
-        def __init__(self, name: str):
-            self.name = name
-            self.tools = []
-        
-        def tool(self, name: str = None, description: str = None):
-            def decorator(func):
-                tool_name = name or func.__name__
-                self.tools.append({
-                    "name": tool_name,
-                    "description": description or func.__doc__ or "No description",
-                    "handler": func
-                })
-                return func
-            return decorator
+from mcp.server.models import InitializeResult
+from mcp.server import NotificationOptions, Server  
+from mcp.types import Resource, Tool, TextContent, ImageContent, EmbeddedResource
+from starlette.applications import Starlette
+from starlette.routing import Route
+from starlette.responses import JSONResponse
+from starlette.requests import Request
+import mcp.types as types
+import uvicorn
 
+# Create the MCP server instance
+server = Server("mcp-builder")
 
 # User management
 user_db = {}  # email -> uuid mapping
 
 # Platform viability cache
 platform_cache = {}
-
-# FastMCP compatible server object
-mcp = FastMCP("mcp-builder")
-server = mcp  # For backward compatibility
-app = mcp  # FastMCP expects 'app' or 'mcp' variable
 
 def get_user_uuid(email: str = None) -> str:
     """Get fixed UUID for public access"""
@@ -75,50 +62,88 @@ async def assess_platform_api(platform: str) -> Dict[str, Any]:
     # For unknown platforms, return as potentially viable but needs assessment
     return {"viable": True, "oauth_required": False, "needs_research": True}
 
-@mcp.tool(
-    name="is_building_mcp_server_viable",
-    description="Check if building an MCP server for a platform is viable"
-)
-async def is_building_mcp_server_viable(platform: str) -> str:
-    """Check if building an MCP server for a platform is viable"""
-    if not platform:
-        return "Error: platform is required"
-    
-    # Assess platform viability
-    assessment = await assess_platform_api(platform)
-    
-    if assessment["viable"]:
-        required_params = {
-            "platform_name": platform,
-            "description": "Required - Description of what the MCP server should do"
-        }
-        
-        response = {
-            "viable": True,
-            "message": f"Building an MCP server for {platform} is viable",
-            "required_parameters": required_params
-        }
-    else:
-        response = {
-            "viable": False,
-            "message": f"Building an MCP server for {platform} is not currently supported"
-        }
-        
-    return json.dumps(response, indent=2)
+@server.list_tools()
+async def handle_list_tools() -> list[Tool]:
+    """List available tools"""
+    return [
+        Tool(
+            name="is_building_mcp_server_viable",
+            description="Check if building an MCP server for a platform is viable",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "platform": {
+                        "type": "string",
+                        "description": "Name of the platform to assess"
+                    }
+                },
+                "required": ["platform"]
+            }
+        ),
+        Tool(
+            name="build_mcp_server", 
+            description="Build an MCP server for the specified platform",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "platform": {
+                        "type": "string",
+                        "description": "Name of the platform"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Description of what the MCP server should do"
+                    }
+                },
+                "required": ["platform", "description"]
+            }
+        )
+    ]
 
-@mcp.tool(
-    name="build_mcp_server",
-    description="Build an MCP server for the specified platform"
-)
-async def build_mcp_server(
-    platform: str, 
-    description: str,
-    user_email: str = "public@example.com"
-) -> str:
-    """Build an MCP server for the specified platform"""
+@server.call_tool()
+async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+    """Handle tool calls"""
+    if name == "is_building_mcp_server_viable":
+        platform = arguments.get("platform")
+        if not platform:
+            return [types.TextContent(type="text", text="Error: platform is required")]
+        
+        # Assess platform viability
+        assessment = await assess_platform_api(platform)
+        
+        if assessment["viable"]:
+            required_params = {
+                "platform_name": platform,
+                "description": "Required - Description of what the MCP server should do"
+            }
+            
+            response = {
+                "viable": True,
+                "message": f"Building an MCP server for {platform} is viable",
+                "required_parameters": required_params
+            }
+        else:
+            response = {
+                "viable": False,
+                "message": f"Building an MCP server for {platform} is not currently supported"
+            }
+            
+        return [types.TextContent(type="text", text=json.dumps(response, indent=2))]
+    
+    elif name == "build_mcp_server":
+        return await handle_build_server_tool(arguments)
+    
+    else:
+        return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
+
+async def handle_build_server_tool(arguments: dict) -> list[types.TextContent]:
+    """Handle build_mcp_server tool calls"""
+    platform = arguments.get("platform")
+    description = arguments.get("description")
+    
     # Validate required parameters
     if not all([platform, description]):
-        return "Error: platform and description are required"
+        return [types.TextContent(type="text", text="Error: platform and description are required")]
     
     # Get fixed public UUID
     user_uuid = get_user_uuid()
@@ -137,7 +162,7 @@ async def build_mcp_server(
         }
         
         # Save feature request (in real implementation, save to database)
-        return f"Platform {platform} is not currently supported, but your request has been noted for future development."
+        return [types.TextContent(type="text", text=f"Platform {platform} is not currently supported, but your request has been noted for future development.")]
     
     # Determine next version number
     base_builds_path = Path(__file__).parent / "builds" / user_uuid / platform
@@ -169,7 +194,7 @@ async def build_mcp_server(
         from .pipeline import pipeline
         asyncio.create_task(pipeline.execute_build_pipeline(
             user_uuid=user_uuid,
-            user_email=user_email,
+            user_email="public@example.com",
             platform=platform,
             description=description,
             version=version
@@ -178,12 +203,105 @@ async def build_mcp_server(
         # Pipeline not available, continue without it
         print(f"Build pipeline triggered for {user_uuid}/{platform}/v{version}")
     
-    return f"MCP server build initiated for {platform}. Build ID: {user_uuid}/{platform}/v{version}. Build will be publicly accessible when deployment is complete."
+    return [types.TextContent(type="text", text=f"MCP server build initiated for {platform}. Build ID: {user_uuid}/{platform}/v{version}. Build will be publicly accessible when deployment is complete.")]
 
-# FastMCP handles server initialization automatically
-# No need for custom HTTP server implementation
+async def handle_mcp(request: Request):
+    """Handle MCP protocol requests on /mcp endpoint"""
+    try:
+        body = await request.json()
+        method = body.get("method")
+        params = body.get("params", {})
+        request_id = body.get("id")
+        
+        if method == "initialize":
+            response = {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {
+                        "tools": {},
+                        "resources": {},
+                    },
+                    "serverInfo": {
+                        "name": "mcp-builder",
+                        "version": "1.0.0"
+                    }
+                }
+            }
+            
+        elif method == "tools/list":
+            tools = await handle_list_tools()
+            response = {
+                "jsonrpc": "2.0", 
+                "id": request_id,
+                "result": {
+                    "tools": [
+                        {
+                            "name": tool.name,
+                            "description": tool.description,
+                            "inputSchema": tool.inputSchema
+                        } for tool in tools
+                    ]
+                }
+            }
+            
+        elif method == "tools/call":
+            tool_name = params.get("name")
+            arguments = params.get("arguments", {})
+            
+            try:
+                result = await handle_call_tool(tool_name, arguments)
+                response = {
+                    "jsonrpc": "2.0",
+                    "id": request_id, 
+                    "result": {
+                        "content": [
+                            {
+                                "type": content.type,
+                                "text": content.text
+                            } for content in result
+                        ]
+                    }
+                }
+            except Exception as e:
+                response = {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -1,
+                        "message": str(e)
+                    }
+                }
+        else:
+            response = {
+                "jsonrpc": "2.0", 
+                "id": request_id,
+                "error": {
+                    "code": -32601,
+                    "message": f"Method not found: {method}"
+                }
+            }
+            
+        return JSONResponse(response)
+        
+    except Exception as e:
+        return JSONResponse({
+            "jsonrpc": "2.0",
+            "id": None,
+            "error": {
+                "code": -32700,
+                "message": f"Parse error: {str(e)}"
+            }
+        }, status_code=400)
+
+# Create Starlette app
+app = Starlette(
+    routes=[
+        Route("/mcp", handle_mcp, methods=["POST"]),
+    ]
+)
 
 if __name__ == "__main__":
-    # For development/testing - FastMCP deployment handles this automatically
-    import uvicorn
-    uvicorn.run(mcp, host="0.0.0.0", port=int(os.environ.get('PORT', 8000)))
+    port = int(os.environ.get('PORT', 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

@@ -1,7 +1,14 @@
 # MCP Builder System Dependencies
 
-# FastMCP framework for MCP server deployment
+# Standard MCP server implementation
+mcp>=1.0.0
+
+# FastMCP framework for MCP server deployment (fallback)
 fastmcp>=0.1.0
+
+# HTTP/SSE server for streamable MCP
+starlette>=0.27.0
+uvicorn>=0.23.0
 
 # HTTP Client for API calls
 httpx>=0.24.0
