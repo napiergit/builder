@@ -1,5 +1,8 @@
 # MCP Builder System Dependencies
 
+# FastMCP framework for MCP server deployment
+fastmcp>=0.1.0
+
 # HTTP Client for API calls
 httpx>=0.24.0
 
