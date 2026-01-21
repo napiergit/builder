@@ -223,7 +223,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             f.write(json.dumps(prompt_data, indent=2))
         
         # Trigger async pipeline
-        from pipeline import pipeline
+        from .pipeline import pipeline
         asyncio.create_task(pipeline.execute_build_pipeline(
             user_uuid=user_uuid,
             user_email=user_email,

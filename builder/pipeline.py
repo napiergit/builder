@@ -29,7 +29,7 @@ class MCPBuilderPipeline:
         self.code_generator = CodeGenerator()
         self.deployment_config = DeploymentConfig()
         self.deployer = Deployer(self.deployment_config)
-        self.builds_base_path = Path(__file__).parent / "builder" / "builds"
+        self.builds_base_path = Path(__file__).parent / "builds"
         
     async def execute_build_pipeline(
         self,
