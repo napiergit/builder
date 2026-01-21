@@ -7,13 +7,83 @@ import asyncio
 import json
 import uuid
 from datetime import datetime
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, List
 from pathlib import Path
 import os
+import sys
 
-from mcp import types
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
+# FastMCP compatible server implementation
+class MCPTypes:
+    class Tool:
+        def __init__(self, name: str, description: str, inputSchema: dict):
+            self.name = name
+            self.description = description
+            self.inputSchema = inputSchema
+    
+    class TextContent:
+        def __init__(self, type: str, text: str):
+            self.type = type
+            self.text = text
+
+types = MCPTypes()
+
+class MCPServer:
+    def __init__(self, name: str):
+        self.name = name
+        self.tools = []
+        self.tool_handlers = {}
+    
+    def list_tools(self):
+        def decorator(func):
+            self._list_tools_handler = func
+            return func
+        return decorator
+    
+    def call_tool(self):
+        def decorator(func):
+            self._call_tool_handler = func
+            return func
+        return decorator
+    
+    async def handle_request(self, method: str, params: dict) -> dict:
+        if method == "tools/list":
+            tools = await self._list_tools_handler()
+            return {
+                "tools": [
+                    {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "inputSchema": tool.inputSchema
+                    } for tool in tools
+                ]
+            }
+        elif method == "tools/call":
+            name = params.get("name")
+            arguments = params.get("arguments", {})
+            result = await self._call_tool_handler(name, arguments)
+            return {
+                "content": [
+                    {
+                        "type": content.type,
+                        "text": content.text
+                    } for content in result
+                ]
+            }
+        else:
+            return {"error": f"Unknown method: {method}"}
+
+def stdio_server():
+    class StdioContext:
+        def __init__(self):
+            pass
+        
+        async def __aenter__(self):
+            return [sys.stdin, sys.stdout]
+        
+        async def __aexit__(self, *args):
+            pass
+    
+    return StdioContext()
 
 
 # User management
@@ -22,7 +92,7 @@ user_db = {}  # email -> uuid mapping
 # Platform viability cache
 platform_cache = {}
 
-server = Server("mcp-builder")
+server = MCPServer("mcp-builder")
 
 def get_user_uuid(email: str) -> str:
     """Get or create UUID for user email"""
@@ -245,11 +315,46 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         )]
 
 async def main():
-    """Main server loop"""
-    async with stdio_server() as streams:
-        await server.run(
-            streams[0], streams[1], server.create_initialization_options()
-        )
+    """Main server loop for FastMCP deployment"""
+    # For FastMCP deployment, we create a simple HTTP server
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+    import threading
+    import urllib.parse
+    
+    class MCPHandler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length).decode('utf-8')
+                request_data = json.loads(post_data)
+                
+                method = request_data.get('method')
+                params = request_data.get('params', {})
+                
+                # Handle the request
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                response = loop.run_until_complete(server.handle_request(method, params))
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+                
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                error_response = {"error": str(e)}
+                self.wfile.write(json.dumps(error_response).encode('utf-8'))
+        
+        def log_message(self, format, *args):
+            pass  # Suppress log messages
+    
+    port = int(os.environ.get('PORT', 8000))
+    httpd = HTTPServer(('', port), MCPHandler)
+    print(f"MCP Builder server running on port {port}")
+    httpd.serve_forever()
 
 if __name__ == "__main__":
     asyncio.run(main())
