@@ -3,13 +3,16 @@
   "description": "MCP Builder - Automated MCP server generation and deployment",
   "version": "1.0.0",
   "author": "napiergit",
-  "main": "server.py",
+  "main": "builder/server.py",
   "runtime": "python3.9",
   "dependencies": {
     "python": "requirements.txt"
   },
   "environment": {
     "PORT": "8000"
+  },
+  "auth": {
+    "type": "none"
   },
   "tools": [
     {
