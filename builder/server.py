@@ -45,11 +45,10 @@ mcp = FastMCP("mcp-builder")
 server = mcp  # For backward compatibility
 app = mcp  # FastMCP expects 'app' or 'mcp' variable
 
-def get_user_uuid(email: str) -> str:
-    """Get or create UUID for user email"""
-    if email not in user_db:
-        user_db[email] = str(uuid.uuid4())
-    return user_db[email]
+def get_user_uuid(email: str = None) -> str:
+    """Get fixed UUID for public access"""
+    # Return fixed UUID with all 1s for public access
+    return "11111111-1111-1111-1111-111111111111"
 
 def get_builds_path(user_uuid: str, platform: str, version: int) -> Path:
     """Get the path for builds storage"""
@@ -62,28 +61,28 @@ async def assess_platform_api(platform: str) -> Dict[str, Any]:
     # In real implementation, this would analyze the platform's API
     
     known_platforms = {
-        "github": {"viable": True, "oauth_required": True},
-        "gmail": {"viable": True, "oauth_required": True}, 
-        "slack": {"viable": True, "oauth_required": True},
-        "twitter": {"viable": True, "oauth_required": True},
-        "discord": {"viable": True, "oauth_required": True},
-        "notion": {"viable": True, "oauth_required": True},
+        "github": {"viable": True, "oauth_required": False},
+        "gmail": {"viable": True, "oauth_required": False}, 
+        "slack": {"viable": True, "oauth_required": False},
+        "twitter": {"viable": True, "oauth_required": False},
+        "discord": {"viable": True, "oauth_required": False},
+        "notion": {"viable": True, "oauth_required": False},
     }
     
     if platform.lower() in known_platforms:
         return known_platforms[platform.lower()]
     
     # For unknown platforms, return as potentially viable but needs assessment
-    return {"viable": True, "oauth_required": True, "needs_research": True}
+    return {"viable": True, "oauth_required": False, "needs_research": True}
 
 @mcp.tool(
     name="is_building_mcp_server_viable",
     description="Check if building an MCP server for a platform is viable"
 )
-async def is_building_mcp_server_viable(platform: str, user_email: str) -> str:
+async def is_building_mcp_server_viable(platform: str) -> str:
     """Check if building an MCP server for a platform is viable"""
-    if not platform or not user_email:
-        return "Error: platform and user_email are required"
+    if not platform:
+        return "Error: platform is required"
     
     # Assess platform viability
     assessment = await assess_platform_api(platform)
@@ -91,11 +90,7 @@ async def is_building_mcp_server_viable(platform: str, user_email: str) -> str:
     if assessment["viable"]:
         required_params = {
             "platform_name": platform,
-            "oauth_credentials": {
-                "client_id": "Required - OAuth Client ID for the platform",
-                "client_secret": "Required - OAuth Client Secret", 
-                "redirect_url": "Required - OAuth Redirect URL"
-            }
+            "description": "Required - Description of what the MCP server should do"
         }
         
         response = {
@@ -117,19 +112,16 @@ async def is_building_mcp_server_viable(platform: str, user_email: str) -> str:
 )
 async def build_mcp_server(
     platform: str, 
-    user_email: str, 
-    client_id: str, 
-    client_secret: str, 
-    redirect_url: str, 
-    description: str
+    description: str,
+    user_email: str = "public@example.com"
 ) -> str:
     """Build an MCP server for the specified platform"""
     # Validate required parameters
-    if not all([platform, user_email, client_id, client_secret, redirect_url, description]):
-        return "Error: All parameters are required (platform, user_email, client_id, client_secret, redirect_url, description)"
+    if not all([platform, description]):
+        return "Error: platform and description are required"
     
-    # Get user UUID
-    user_uuid = get_user_uuid(user_email)
+    # Get fixed public UUID
+    user_uuid = get_user_uuid()
     
     # Assess API viability first
     assessment = await assess_platform_api(platform)
@@ -163,14 +155,10 @@ async def build_mcp_server(
     prompt_data = {
         "platform": platform,
         "description": description,
-        "oauth_credentials": {
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "redirect_url": redirect_url
-        },
         "user_uuid": user_uuid,
         "version": version,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "public_access": True
     }
     
     with open(build_path / "prompt.txt", "w") as f:
@@ -184,14 +172,13 @@ async def build_mcp_server(
             user_email=user_email,
             platform=platform,
             description=description,
-            oauth_creds=prompt_data["oauth_credentials"],
             version=version
         ))
     except ImportError:
         # Pipeline not available, continue without it
         print(f"Build pipeline triggered for {user_uuid}/{platform}/v{version}")
     
-    return f"MCP server build initiated for {platform}. Build ID: {user_uuid}/{platform}/v{version}. You will receive an email when deployment is complete."
+    return f"MCP server build initiated for {platform}. Build ID: {user_uuid}/{platform}/v{version}. Build will be publicly accessible when deployment is complete."
 
 # FastMCP handles server initialization automatically
 # No need for custom HTTP server implementation
