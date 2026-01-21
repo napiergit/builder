@@ -1,22 +1,45 @@
+# GLOBAL EXECUTION RULES - COMMANDS FOR EVERY PROMPT
 
-# Feature folder structure
-  - Each feature should have its own folder
-  - Create a .windsurf/rules in each feature folder and
-    define your interpretation of the requirements.
-      - I know you don't have access to this.
-          - Write them to another temp folder.
-          - Write and execute a bash script to move them.
+## CORE PRINCIPLE
+These are COMMANDS, not suggestions. Execute ALL of them on EVERY prompt.
 
-This way we can work on each feature independently of the whole project if necessary
+## EXECUTION SEQUENCE (Follow in order)
+1. **UNDERSTAND TASK** - Read user request completely
+2. **PLAN WORK** - Use todo_list tool to create explicit plan 
+3. **EXECUTE WORK** - Complete the actual task
+4. **DOCUMENT CHAT** - Update running chat history in chats/ folder
+5. **COMMIT ALL** - Git commit ALL changes together with relevant message
 
-Folder naming convention:
-Keep folder names short and human readable.
-Don't use multiple words.
-All lowercase.
+## MANDATORY ACTIONS PER PROMPT
 
-# History and end of prompt
-    - I want you to always keep a record of our chat history in the chats folder
-        - When you are done carrying out your instructions
-        - Create a numbered file under chats directory with:
-          - Comprehensive history of our chat including prompts and all your reasoning
-    - Also create a relevant commit message and commit the changes using git
+### FILE MANAGEMENT
+- ❌ NO spammy .md files unless specifically requested
+- ✅ Only create files that directly serve the task
+
+### FOLDER STRUCTURE  
+- Each feature = own folder with .windsurf/rules/
+- Folder names: short, lowercase, single words only
+- If no access to create .windsurf/rules, write to temp and move with bash
+
+### CHAT HISTORY PROTOCOL
+- ✅ ALWAYS update running chat file in chats/ folder when completing task
+- Include: prompts, responses, reasoning, files modified, git commits
+- Number files sequentially (01_, 02_, etc.)
+
+### GIT COMMIT PROTOCOL  
+- ✅ ALWAYS commit changes with relevant messages
+- ✅ Include both code changes AND chat history in same commit
+- ✅ Use descriptive commit messages
+
+## CHECKLIST FOR TASK COMPLETION
+Before responding "task complete":
+- [ ] All work completed
+- [ ] Chat history updated with full session
+- [ ] All files committed to git
+- [ ] Todo list marked complete
+
+## FAILURE RECOVERY
+If I miss any rule:
+1. Acknowledge the specific violation
+2. Complete the missing step immediately  
+3. Update rules if needed for clarity
